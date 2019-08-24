@@ -38,7 +38,7 @@
     "jsonwebtoken": "^8.1.1",
     "lame": "^1.2.4",
     "method-override": "^2.3.8",
-    "morgan": "^1.9.0",
+    "morgan": "^1.9.1",
     "mp3-duration": "^1.1.0",
     "musicmetadata": "^2.0.5",
     "mysql": "^2.13.0",
