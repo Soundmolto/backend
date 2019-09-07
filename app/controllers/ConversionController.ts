@@ -1,14 +1,13 @@
 import { createHash, Hash } from 'crypto';
 import { IncomingForm } from 'formidable';
 import { createReadStream, existsSync, ReadStream, renameSync, unlinkSync } from 'fs';
-import * as mp3Duration from 'mp3-duration';
-import * as Metadata from 'musicmetadata';
+import * as musicMetadata from 'music-metadata';
 import { Lame } from 'node-lame';
 import { join, resolve } from 'path';
 import { Files, FileToConvert } from '../interfaces/files';
-import { MusicMetadata } from '../interfaces/metadata';
 
 import * as waveform from 'waveform';
+import { IAudioMetadata } from "music-metadata";
 const root = resolve(process.cwd(), '.');
 export const uploadDirectory: string = join(resolve(root), '/uploads');
 const waveformFile = (file: string) => resolve(uploadDirectory, file);
@@ -31,14 +30,8 @@ function encoder_wrapper (output: string, filePath: string) {
 }
 
 function calculate_duration (file: string): Promise<number> {
-	return new Promise((res, rej) => {
-		mp3Duration(file, (err: Error | null, duration: number) => {
-			if (err) {
-				rej(err.message);
-			}
-
-			res(duration);
-		  });
+	return musicMetadata.parseFile(file).then(metadata => {
+		return metadata.format.duration;
 	});
 }
 
@@ -81,32 +74,11 @@ function hash_file (file: string): Promise<string> {
 	});
 }
 
-function get_metadata (file: string): Promise<MusicMetadata> {
-	return new Promise((res) => {
-		const readableStream: ReadStream = createReadStream(file);
-
-		try {
-			Metadata(readableStream, { duration: true }, (err: Error|null, md: MusicMetadata) => {
-				if (err) {
-					res(null);
-				}
-
-				const data = Object.assign({}, md);
-				readableStream.close();
-				res(data);
-			});
-		} catch (error) {
-			console.error(error);
-			res(null);
-		}
-	});
-}
-
 export async function convert_to_mp3 (file: FileToConvert) {
 	let fileName: string | null;
 	let alreadyExists: boolean = false;
 	let waveformLocation: string;
-	let metadata: MusicMetadata|null = null;
+	let metadata: IAudioMetadata|null = null;
 	let hash: string = '';
 
 	try {
@@ -123,20 +95,20 @@ export async function convert_to_mp3 (file: FileToConvert) {
 			await create_waveform(fileLocation, waveformLocation);
 		}
 
-		metadata = await get_metadata(fileLocation);
+		metadata = await musicMetadata.parseFile(fileLocation, {duration: true});
 
 		unlinkSync(newPath);
-	} catch (error) {
-		console.error(error);
-	} finally {
+
 		return {
-			calculate_duration,
 			file_name: fileName,
 			hash,
 			metadata,
 			sharedFile: alreadyExists,
 			waveform_location: waveformLocation,
 		};
+
+	} catch (error) {
+		console.error(error);
 	}
 }
 
