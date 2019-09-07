@@ -27,7 +27,7 @@
     "@types/jsonwebtoken": "^7.2.0",
     "@types/method-override": "0.0.31",
     "@types/node": "^9.4.0",
-    "bcrypt": "^1.0.3",
+    "bcrypt": "^3.0.6",
     "body-parser": "^1.17.1",
     "cluster": "^0.7.7",
     "cors": "^2.8.3",
