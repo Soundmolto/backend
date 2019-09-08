@@ -6,7 +6,7 @@ import { join, resolve } from 'path';
 import { Files, FileToConvert } from '../interfaces/files';
 
 import * as waveform from 'waveform';
-import { IAudioMetadata, parseFile } from "music-metadata";
+import { parseFile } from "music-metadata";
 const root = resolve(process.cwd(), '.');
 export const uploadDirectory: string = join(resolve(root), '/uploads');
 const waveformFile = (file: string) => resolve(uploadDirectory, file);
@@ -68,28 +68,23 @@ function hash_file (file: string): Promise<string> {
 }
 
 export async function convert_to_mp3 (file: FileToConvert) {
-	let fileName: string | null;
-	let alreadyExists: boolean = false;
-	let waveformLocation: string;
-	let metadata: IAudioMetadata|null = null;
-	let hash: string = '';
 
 	try {
 		const newPath: string = `${file.path.split('/uploads/')[0]}/uploads/.${file.name}`;
-		hash = await hash_file(file.path);
-		fileName = resolve(uploadDirectory, `${hash}`);
-		waveformLocation = waveformFile(`waveform-${hash}`);
+		const hash = await hash_file(file.path);
+		const fileName = resolve(uploadDirectory, `${hash}`);
+		const waveformLocation = waveformFile(`waveform-${hash}`);
 		const fileLocation: string = `${fileName}.mp3`;
-		alreadyExists = existsSync(fileLocation) && existsSync(waveformLocation);
+    const alreadyExists = existsSync(fileLocation) && existsSync(waveformLocation);
 		renameSync(file.path, newPath);
 
-		if (false === alreadyExists) {
+		if (!alreadyExists) {
 			await encoder_wrapper(fileLocation, newPath);
 			await create_waveform(fileLocation, waveformLocation);
 		}
 
 		// get the duration at the cost of parsing the entire file if necessary
-		metadata = await parseFile(fileLocation, {duration: true});
+		const metadata = await parseFile(fileLocation, {duration: true});
 
 		unlinkSync(newPath);
 
@@ -102,7 +97,13 @@ export async function convert_to_mp3 (file: FileToConvert) {
 		};
 
 	} catch (error) {
-		console.error(error);
+		console.error(`Error parsing ${file.name}: ${error.message}`);
+		return {
+      file_name: null,
+      hash: '',
+      sharedFile: null,
+      waveform_location: null
+    }
 	}
 }
 
