@@ -1,13 +1,12 @@
 import { createHash, Hash } from 'crypto';
 import { IncomingForm } from 'formidable';
 import { createReadStream, existsSync, ReadStream, renameSync, unlinkSync } from 'fs';
-import * as musicMetadata from 'music-metadata';
 import { Lame } from 'node-lame';
 import { join, resolve } from 'path';
 import { Files, FileToConvert } from '../interfaces/files';
 
 import * as waveform from 'waveform';
-import { IAudioMetadata } from "music-metadata";
+import { IAudioMetadata, parseFile } from "music-metadata";
 const root = resolve(process.cwd(), '.');
 export const uploadDirectory: string = join(resolve(root), '/uploads');
 const waveformFile = (file: string) => resolve(uploadDirectory, file);
@@ -26,12 +25,6 @@ function encoder_wrapper (output: string, filePath: string) {
 			.encode()
 			.then(() => { response(true); })
 			.catch((e: Error) => reject(e));
-	});
-}
-
-function calculate_duration (file: string): Promise<number> {
-	return musicMetadata.parseFile(file).then(metadata => {
-		return metadata.format.duration;
 	});
 }
 
@@ -95,7 +88,8 @@ export async function convert_to_mp3 (file: FileToConvert) {
 			await create_waveform(fileLocation, waveformLocation);
 		}
 
-		metadata = await musicMetadata.parseFile(fileLocation, {duration: true});
+		// get the duration at the cost of parsing the entire file if necessary
+		metadata = await parseFile(fileLocation, {duration: true});
 
 		unlinkSync(newPath);
 
