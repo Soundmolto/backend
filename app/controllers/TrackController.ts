@@ -5,7 +5,7 @@ import { getManager } from 'typeorm';
 
 import { User } from '../entity/User';
 import { UserRole } from '../enums/UserRole';
-import { Track } from './../entity/Track';
+import { Track } from '../entity/Track';
 import { getUrlRoute, guid } from './CommonFunctions';
 import { convert_to_mp3, parse_form } from './ConversionController';
 import { StorageController } from './StorageController';
@@ -56,7 +56,7 @@ export class TrackController {
 	 */
 	public static async CreateTrackObject (track: StubbedTrack, user: User) {
 		const newTrack = new Track();
-		const { file_name, sharedFile, waveform_location, metadata, hash, calculate_duration } = await convert_to_mp3(track);
+		const { file_name, sharedFile, waveform_location, metadata, hash } = await convert_to_mp3(track);
 		const path = file_name.split('/uploads/')[1];
 		const id = guid();
 		let title = track.name;
@@ -65,12 +65,12 @@ export class TrackController {
 		let genres = [];
 
 		if (metadata != null) {
-			if (metadata.title.trim() !== '') {
-				title = metadata.title;
+			if (metadata.common.title) {
+				title = metadata.common.title;
 			}
-			duration = metadata.duration;
-			if (metadata.picture != null && metadata.picture.length >= 1) {
-				const picture = metadata.picture[0];
+			duration = metadata.format.duration;
+			if (metadata.common.picture != null && metadata.common.picture.length >= 1) {
+				const picture = metadata.common.picture[0];
 				let converted = '';
 				try {
 					converted = (await convert_png(picture.data, hash) as string);
@@ -81,11 +81,7 @@ export class TrackController {
 				}
 			}
 
-			genres = metadata.genre || [];
-		}
-
-		if (duration === 0) {
-			duration = await calculate_duration(`${file_name}.mp3`);
+			genres = metadata.common.genre || [];
 		}
 
 		let url = encodeURIComponent(title.split(' ').join('-')).toLocaleLowerCase();

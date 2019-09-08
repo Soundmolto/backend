@@ -1,14 +1,12 @@
 import { createHash, Hash } from 'crypto';
 import { IncomingForm } from 'formidable';
 import { createReadStream, existsSync, ReadStream, renameSync, unlinkSync } from 'fs';
-import * as mp3Duration from 'mp3-duration';
-import * as Metadata from 'musicmetadata';
 import { Lame } from 'node-lame';
 import { join, resolve } from 'path';
 import { Files, FileToConvert } from '../interfaces/files';
-import { MusicMetadata } from '../interfaces/metadata';
 
 import * as waveform from 'waveform';
+import { parseFile } from "music-metadata";
 const root = resolve(process.cwd(), '.');
 export const uploadDirectory: string = join(resolve(root), '/uploads');
 const waveformFile = (file: string) => resolve(uploadDirectory, file);
@@ -27,18 +25,6 @@ function encoder_wrapper (output: string, filePath: string) {
 			.encode()
 			.then(() => { response(true); })
 			.catch((e: Error) => reject(e));
-	});
-}
-
-function calculate_duration (file: string): Promise<number> {
-	return new Promise((res, rej) => {
-		mp3Duration(file, (err: Error | null, duration: number) => {
-			if (err) {
-				rej(err.message);
-			}
-
-			res(duration);
-		  });
 	});
 }
 
@@ -81,62 +67,43 @@ function hash_file (file: string): Promise<string> {
 	});
 }
 
-function get_metadata (file: string): Promise<MusicMetadata> {
-	return new Promise((res) => {
-		const readableStream: ReadStream = createReadStream(file);
-
-		try {
-			Metadata(readableStream, { duration: true }, (err: Error|null, md: MusicMetadata) => {
-				if (err) {
-					res(null);
-				}
-
-				const data = Object.assign({}, md);
-				readableStream.close();
-				res(data);
-			});
-		} catch (error) {
-			console.error(error);
-			res(null);
-		}
-	});
-}
-
 export async function convert_to_mp3 (file: FileToConvert) {
-	let fileName: string | null;
-	let alreadyExists: boolean = false;
-	let waveformLocation: string;
-	let metadata: MusicMetadata|null = null;
-	let hash: string = '';
 
 	try {
 		const newPath: string = `${file.path.split('/uploads/')[0]}/uploads/.${file.name}`;
-		hash = await hash_file(file.path);
-		fileName = resolve(uploadDirectory, `${hash}`);
-		waveformLocation = waveformFile(`waveform-${hash}`);
+		const hash = await hash_file(file.path);
+		const fileName = resolve(uploadDirectory, `${hash}`);
+		const waveformLocation = waveformFile(`waveform-${hash}`);
 		const fileLocation: string = `${fileName}.mp3`;
-		alreadyExists = existsSync(fileLocation) && existsSync(waveformLocation);
+    const alreadyExists = existsSync(fileLocation) && existsSync(waveformLocation);
 		renameSync(file.path, newPath);
 
-		if (false === alreadyExists) {
+		if (!alreadyExists) {
 			await encoder_wrapper(fileLocation, newPath);
 			await create_waveform(fileLocation, waveformLocation);
 		}
 
-		metadata = await get_metadata(fileLocation);
+		// get the duration at the cost of parsing the entire file if necessary
+		const metadata = await parseFile(fileLocation, {duration: true});
 
 		unlinkSync(newPath);
-	} catch (error) {
-		console.error(error);
-	} finally {
+
 		return {
-			calculate_duration,
 			file_name: fileName,
 			hash,
 			metadata,
 			sharedFile: alreadyExists,
 			waveform_location: waveformLocation,
 		};
+
+	} catch (error) {
+		console.error(`Error parsing ${file.name}: ${error.message}`);
+		return {
+      file_name: null,
+      hash: '',
+      sharedFile: null,
+      waveform_location: null
+    }
 	}
 }
 
